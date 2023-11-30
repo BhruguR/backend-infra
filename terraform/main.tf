@@ -25,11 +25,11 @@ resource "aws_dynamodb_table" "example" {
   name           = "example"
   read_capacity  = 20
   write_capacity = 20
-  hash_key       = "ID"
+  hash_key       = "ToDo"
 
   attribute {
-    name = "ID"
-    type = "N"
+    name = "ToDo"
+    type = "S"
   }
 }
 
@@ -65,9 +65,10 @@ resource "aws_iam_policy" "iam_policy_for_lambda" {
      "Action": [
        "logs:CreateLogGroup",
        "logs:CreateLogStream",
-       "logs:PutLogEvents"
+       "logs:PutLogEvents",
+       "dynamodb:*"
      ],
-     "Resource": "arn:aws:logs:*:*:*",
+     "Resource": "*",
      "Effect": "Allow"
    }
  ]
@@ -86,13 +87,14 @@ source_dir  = "${path.module}/python/"
 output_path = "${path.module}/python/lambda.zip"
 }
 
-resource "aws_lambda_function" "terraform_lambda_func" {
+resource "aws_lambda_function" "work_func" {
 filename                       = "${path.module}/python/lambda.zip"
 function_name                  = "lambda_handler"
 role                           = aws_iam_role.lambda_role.arn
-handler                        = "index.lambda_handler"
+handler                        = "python.lambda_handler"
 runtime                        = "python3.8"
 depends_on                     = [aws_iam_role_policy_attachment.attach_iam_policy_to_iam_role]
+timeout = 120
 }
 
 
@@ -122,12 +124,8 @@ resource "aws_api_gateway_integration" "integration" {
   http_method = "${aws_api_gateway_method.gatewayMethod.http_method}"
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.terraform_lambda_func.invoke_arn
+  uri                     = aws_lambda_function.work_func.invoke_arn
  
-  request_parameters =  {
-    "integration.request.path.proxy" = "method.request.path.proxy"
-  }
-
 }
 
 resource "aws_api_gateway_deployment" "deployment" {
